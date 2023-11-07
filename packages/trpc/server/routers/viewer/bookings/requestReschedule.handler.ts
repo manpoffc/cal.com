@@ -78,29 +78,27 @@ export const requestRescheduleHandler = async ({ ctx, input }: RequestReschedule
     throw new TRPCError({ code: "FORBIDDEN", message: "Booking to reschedule doesn't have an owner" });
   }
 
-  if (!bookingToReschedule.eventType) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "EventType not found for current booking." });
-  }
-
   const bookingBelongsToTeam = !!bookingToReschedule.eventType?.teamId;
 
-  const userTeams = await prisma.user.findUniqueOrThrow({
-    where: {
-      id: user.id,
-    },
-    select: {
-      teams: true,
-    },
-  });
+  if (bookingToReschedule.eventType) {
+    const userTeams = await prisma.user.findUniqueOrThrow({
+      where: {
+        id: user.id,
+      },
+      select: {
+        teams: true,
+      },
+    });
 
-  if (bookingBelongsToTeam && bookingToReschedule.eventType?.teamId) {
-    const userTeamIds = userTeams.teams.map((item) => item.teamId);
-    if (userTeamIds.indexOf(bookingToReschedule?.eventType?.teamId) === -1) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "User isn't a member on the team" });
+    if (bookingBelongsToTeam && bookingToReschedule.eventType?.teamId) {
+      const userTeamIds = userTeams.teams.map((item) => item.teamId);
+      if (userTeamIds.indexOf(bookingToReschedule?.eventType?.teamId) === -1) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "User isn't a member on the team" });
+      }
     }
-  }
-  if (!bookingBelongsToTeam && bookingToReschedule.userId !== user.id) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "User isn't owner of the current booking" });
+    if (!bookingBelongsToTeam && bookingToReschedule.userId !== user.id) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "User isn't owner of the current booking" });
+    }
   }
 
   if (!bookingToReschedule) return;
@@ -184,10 +182,10 @@ export const requestRescheduleHandler = async ({ ctx, input }: RequestReschedule
   director.setBuilder(builder);
   director.setExistingBooking(bookingToReschedule);
   cancellationReason && director.setCancellationReason(cancellationReason);
-  if (event) {
-    await director.buildForRescheduleEmail();
-  } else {
+  if (Object.keys(event).length === 0) {
     await director.buildWithoutEventTypeForRescheduleEmail();
+  } else {
+    await director.buildForRescheduleEmail();
   }
 
   // Handling calendar and videos cancellation
